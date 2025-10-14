@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body{font-family:'Segoe UI',Roboto,sans-serif;background:#1e1e1e;margin:0;padding:0;color:#e0e0e0}
+    header{background:linear-gradient(to bottom,#3a3a3a,#1e1e1e);display:flex;align-items:center;justify-content:space-between;padding:10px 20px;box-shadow:0 2px 5px rgba(0,0,0,.4);position:relative}
+    header img{height:36px}
+    header h1{font-size:18px;margin:0;font-weight:normal;color:#fff;position:absolute;left:50%;transform:translateX(-50%)}
+    .status-btn{background:#1976d2;color:#fff;padding:6px 14px;border:none;border-radius:4px;cursor:pointer}
+    .container{max-width:700px;margin:40px auto;background:rgba(40,40,40,.95);border-radius:10px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.5);text-align:center}
+    .modal{display:none;position:fixed;z-index:9999;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.6);justify-content:center;align-items:center}
+    .modal-content{background:#2b2b2b;padding:20px;border-radius:8px;min-width:300px;text-align:center}
+    .modal-content h3{margin-top:0}.modal-content p{margin:8px 0}
+    .modal-content button{margin-top:12px;padding:8px 16px;border:none;border-radius:4px;cursor:pointer}
+    .btn-secondary{background:#555;color:#fff}.btn-danger{background:#d32f2f;color:#fff}.btn-primary{background:#1976d2;color:#fff}
+  </style>
+  <script>
+    let currentUserEmail = "";
+    let currentUserRole  = "";
+    let currentUserStatus = "";
+    let currentUserName = "";
+
+    function isApproved(status){
+      const s = (status||"").toString().trim().toLowerCase();
+      return ["อนุมัติ","อนุมัติแล้ว","approved"].includes(s);
+    }
+
+    function init(){
+      const statusBtn = document.getElementById('status-btn');
+      statusBtn.innerText = 'กำลังโหลด...';
+      statusBtn.style.display = 'none';
+      google.script.run.withSuccessHandler(render).getCurrentUserInfo();
+    }
+
+    function render(user){
+      const container = document.getElementById('app');
+      currentUserEmail  = user.email;
+      currentUserRole   = user.role || '';
+      currentUserStatus = user.status || '';
+      currentUserName   = user.name || '';
+
+      const statusBtn = document.getElementById('status-btn');
+
+      if(!user.email){
+        container.innerHTML = `<div class="container"><h2>⚠️ กรุณาเข้าสู่ระบบด้วย Gmail</h2></div>`;
+        return;
+      }
+
+      // แสดงปุ่มเฉพาะผู้ที่ได้รับอนุมัติ
+      if (user.found && user.role && user.name && isApproved(user.status)){
+        statusBtn.style.display = 'inline-block';
+        statusBtn.innerText = user.name;
+      } else {
+        statusBtn.style.display = 'none';
+      }
+
+      if (user.found && (!user.role || !user.name)){
+        container.innerHTML = `<div class="container"><h3>✅ ล็อกอินสำเร็จ</h3><p>ข้อมูลของคุณถูกส่งให้ทีมงานแล้ว กรุณากลับมาตรวจสอบอีกครั้ง</p></div>`;
+        return;
+      }
+
+      if (user.found && user.role && user.name){
+        container.innerHTML = `<div class="container"><h2>สวัสดี ${user.name}</h2><p>คุณคือ <b>${user.role}</b></p></div>`;
+      } else {
+        container.innerHTML = `<div class="container"><h3>ยินดีต้อนรับ!</h3>
+          <p>ต้องการลงทะเบียนด้วยอีเมลนี้หรือไม่: <b>${user.email}</b></p>
+          <button class="btn-primary" onclick="confirmRegister('${user.email}')">✅ ยืนยัน</button>
+          <button class="btn-danger" onclick="location.reload()">❌ ยกเลิก</button></div>`;
+      }
+    }
+
+    function confirmRegister(email){
+      google.script.run.withSuccessHandler(()=>{
+        document.getElementById('app').innerHTML =
+          `<div class="container"><h3>✅ ล็อกอินสำเร็จ</h3><p>ข้อมูลของคุณถูกส่งให้ทีมงานแล้ว</p></div>`;
+      }).registerConfirmedUser(email);
+    }
+
+    // -------- Status Modal ----------
+    function openStatusModal(){
+      const statusBtn = document.getElementById('status-btn');
+      statusBtn.innerText = 'กำลังโหลด...';
+      statusBtn.disabled = true;
+
+      google.script.run.withSuccessHandler((data)=>{
+        showModal(data);
+        statusBtn.innerText = currentUserName || 'Status';
+        statusBtn.disabled = false;
+      }).withFailureHandler(()=>{
+        statusBtn.innerText = currentUserName || 'Status';
+        statusBtn.disabled = false;
+        alert('❌ โหลดข้อมูลไม่สำเร็จ');
+      }).getUserDetailsByEmail(currentUserEmail);
+    }
+
+    function showModal(data){
+      if(!data) return;
+      document.getElementById('modal-email').innerText = data.email || '-';
+      document.getElementById('modal-name').innerText  = data.name  || '-';
+      document.getElementById('modal-role').innerText  = data.role  || '-';
+      document.getElementById('admin-section').style.display =
+        (currentUserRole.toLowerCase() === 'adminapp') ? 'block' : 'none';
+      document.getElementById('userModal').style.display = 'flex';
+    }
+
+    function closeStatusModal(){ document.getElementById('userModal').style.display = 'none'; }
+
+    // ปิดเมื่อคลิกนอกกล่อง
+    window.addEventListener('click', (e)=>{
+      const modal = document.getElementById('userModal');
+      if(e.target === modal){ closeStatusModal(); }
+    });
+    window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeStatusModal(); });
+
+    function changeAccount(){
+      if(!confirm('คุณต้องการเปลี่ยนบัญชีใช่หรือไม่?')) return;
+      google.script.run.withSuccessHandler(url=>{ window.location.href = url; }).forceGoogleLogout();
+    }
+
+    function logout(){
+      if(!confirm('คุณต้องการออกจากระบบใช่หรือไม่?')) return;
+      google.script.run.withSuccessHandler(()=>{ location.reload(); }).logoutUser();
+    }
+
+    // -------- Manage Users (open new tab; popup-safe) ----------
+    function openManageUsers(){
+      // ปิด status modal ก่อน
+      closeStatusModal();
+
+      const btn = document.getElementById('manage-users-btn');
+      btn.innerText = 'กำลังเปิด...';
+      btn.disabled  = true;
+
+      // ป้องกัน popup blocker
+      const newWin = window.open('about:blank','_blank');
+
+      google.script.run.withSuccessHandler((baseUrl)=>{
+        const url = baseUrl + '?page=manage_users';
+        if (newWin) newWin.location = url;
+        btn.innerText = 'จัดการผู้ใช้';
+        btn.disabled  = false;
+      }).withFailureHandler(()=>{
+        if (newWin) newWin.close();
+        btn.innerText = 'จัดการผู้ใช้';
+        btn.disabled  = false;
+        alert('❌ เปิดหน้าจัดการผู้ใช้ไม่สำเร็จ');
+      }).getWebAppUrl();
+    }
+
+    window.onload = init;
+  </script>
+</head>
+<body>
+  <header>
+    <img src="https://lh3.googleusercontent.com/d/1DzRRthyeyVFk4UupJkliyHTCNQsoXs2R=w200-h200" alt="WoraCRM Logo">
+    <h1>WoraCRM</h1>
+    <button id="status-btn" class="status-btn" onclick="openStatusModal()">Status</button>
+  </header>
+
+  <div id="app" style="padding:20px;">กำลังโหลด...</div>
+
+  <!-- Status Modal -->
+  <div id="userModal" class="modal">
+    <div class="modal-content">
+      <h3>ข้อมูลผู้ใช้</h3>
+      <p><b>Email:</b> <span id="modal-email"></span></p>
+      <p><b>Name:</b> <span id="modal-name"></span></p>
+      <p><b>Role:</b> <span id="modal-role"></span></p>
+      <div id="admin-section" style="display:none; margin-top:10px;">
+        <hr>
+        <button id="manage-users-btn" class="btn-primary" onclick="openManageUsers()">จัดการผู้ใช้</button>
+      </div>
+      <hr>
+      <button class="btn-secondary" onclick="changeAccount()">เปลี่ยนบัญชี</button>
+      <button class="btn-danger" onclick="logout()">ออกจากระบบ</button>
+      <br>
+      <button class="btn-secondary" style="margin-top:8px;" onclick="closeStatusModal()">ปิด</button>
+    </div>
+  </div>
+</body>
+</html>
