@@ -9,389 +9,316 @@ function getWebAppUrl() {
   return ScriptApp.getService().getUrl();
 }
 
-/** ================================================
- *  WoraCRM v0.81 — Data & Access Base (Single file)
- *  - Sheet หลัก: 'Online' (fallback 'ช่องทางonline')
- *  - คีย์คอลัมน์อังกฤษตามคู่มือ (A..AI → key)
- *  - RBAC: เฉพาะ role 'sales' เห็นเฉพาะแถวที่ S:sales_owner ตรงชื่อ
- *  - พร้อมต่อยอด 0.82+ (Enumus), 0.83 (Compact), 0.84 (Full)
- *  ================================================ */
+/** ---------- READ Online (A1:AI) + Thai header + formats ---------- */
+function readOnlineValues_(){
+  var ss = SpreadsheetApp.getActive();
+  var sh = ss.getSheetByName('Online') || ss.getSheetByName('ช่องทางonline');
+  if (!sh) throw new Error('ไม่พบชีท Online/ช่องทางonline');
+  var rng = sh.getRange('A1:AI');
+  return {
+    values: rng.getDisplayValues(),
+    bgs:    rng.getBackgrounds(),
+    fonts:  rng.getFontColors(),
+    sheetName: sh.getName()
+  };
+}
+function mapRowToObject_(rowArr){
+  var COL = {A:'row_no',B:'prospect_code',C:'erp_code',D:'created_at',E:'date_text',F:'yyyymm',G:'year',H:'month',I:'day',J:'seq_in_month',K:'company',L:'contacts_count',M:'area_text',N:'lead_source',O:'is_new_customer',P:'added_line',Q:'admin_owner',R:'case_owner',S:'sales_owner',T:'handoff_date',U:'items',V:'amount',W:'needs',X:'status',Y:'quote_date',Z:'last_followup_date',AA:'last_follower',AB:'po_date',AC:'payment_term',AD:'so_number',AE:'next_followup_date',AF:'status_changed_at',AG:'owner_changed_at',AH:'updated_at',AI:'is_real_customer'};
+  var letters = Object.keys(COL);
+  var keys = letters.map(function(L){ return COL[L]; });
+  var obj = {};
+  for (var i=0;i<keys.length;i++){ obj[keys[i]] = (rowArr[i] != null ? rowArr[i] : ''); }
+  return obj;
+}
+function readOnlineRowsRaw_(){
+  var pack = readOnlineValues_();
+  var vals = pack.values, bgs = pack.bgs, fonts = pack.fonts;
+  if (!vals || vals.length < 2) return [];
+  var dataRows = vals.slice(1);
 
-/** 👉 เปลี่ยนตามไฟล์จริงของคุณ (ตรงกับลิงก์ Google Sheet) */
-const SHEET_DOC_ID = '1OPt1W2BuzIMqE6q4S5gCe4zxC4yQxKsUbTjumjsrV48';
+  // index คอลัมน์สถานะ = 'X'
+  var COL = {A:'row_no',B:'prospect_code',C:'erp_code',D:'created_at',E:'date_text',F:'yyyymm',G:'year',H:'month',I:'day',J:'seq_in_month',K:'company',L:'contacts_count',M:'area_text',N:'lead_source',O:'is_new_customer',P:'added_line',Q:'admin_owner',R:'case_owner',S:'sales_owner',T:'handoff_date',U:'items',V:'amount',W:'needs',X:'status',Y:'quote_date',Z:'last_followup_date',AA:'last_follower',AB:'po_date',AC:'payment_term',AD:'so_number',AE:'next_followup_date',AF:'status_changed_at',AG:'owner_changed_at',AH:'updated_at',AI:'is_real_customer'};
+  var letters = Object.keys(COL);
+  var statusColIdx = letters.indexOf('X'); // 0-based
 
-/** ONLINE sheet + columns mapping (อิงคู่มือ) */
-const ONLINE_CFG = {
-  DATA_SHEET_CANDIDATES: ['Online', 'ช่องทางonline'], // ใช้ Online เป็นหลัก
-  ENUMUS_SHEET_CANDIDATES: ['Enumus', '__enumus_col__X'],
-  USERS_SHEET_CANDIDATES: ['Users'],
-  RANGE_A1: 'A1:AI', // ครอบคลุมคอลัมน์ A..AI
-  COL: { // A..AI → key อังกฤษ (ห้ามแก้ชื่อ key)
-    A:'row_no', B:'prospect_code', C:'erp_code', D:'created_at', E:'date_text',
-    F:'yyyymm', G:'year', H:'month', I:'day', J:'seq_in_month',
-    K:'company', L:'contacts_count', M:'area_text', N:'lead_source',
-    O:'is_new_customer', P:'added_line', Q:'admin_owner', R:'case_owner',
-    S:'sales_owner', T:'handoff_date', U:'items', V:'amount', W:'needs',
-    X:'status', Y:'quote_date', Z:'last_followup_date', AA:'last_follower',
-    AB:'po_date', AC:'payment_term', AD:'so_number', AE:'next_followup_date',
-    AF:'status_changed_at', AG:'owner_changed_at', AH:'updated_at', AI:'is_real_customer'
+  return dataRows.map(function(rowArr, i){
+    var o = mapRowToObject_(rowArr);
+    // สีสถานะจากชีทจริง (แถว i+1 เพราะตัดหัวแล้ว)
+    o._status_bg = (bgs[i+1]   && bgs[i+1][statusColIdx])  ? bgs[i+1][statusColIdx]  : '';
+    o._status_fc = (fonts[i+1] && fonts[i+1][statusColIdx])? fonts[i+1][statusColIdx]: '';
+    return o;
+  });
+}
+function getOnlineHeaderThaiMap_(){
+  var pack = readOnlineValues_();
+  var header = pack.values[0] || [];
+  var COL = {A:'row_no',B:'prospect_code',C:'erp_code',D:'created_at',E:'date_text',F:'yyyymm',G:'year',H:'month',I:'day',J:'seq_in_month',K:'company',L:'contacts_count',M:'area_text',N:'lead_source',O:'is_new_customer',P:'added_line',Q:'admin_owner',R:'case_owner',S:'sales_owner',T:'handoff_date',U:'items',V:'amount',W:'needs',X:'status',Y:'quote_date',Z:'last_followup_date',AA:'last_follower',AB:'po_date',AC:'payment_term',AD:'so_number',AE:'next_followup_date',AF:'status_changed_at',AG:'owner_changed_at',AH:'updated_at',AI:'is_real_customer'};
+  var letters = Object.keys(COL), map={};
+  for (var i=0;i<letters.length;i++){
+    var key = COL[letters[i]];
+    map[key] = header[i] || key;
   }
-};
+  return map;
+}
 
-/** RBAC: กติกาการมองเห็น */
-const RBAC = {
-  // เฉพาะ role 'sales' ที่จำกัดให้เห็นเฉพาะแถวที่ตนเป็นผู้ดูแล (คอลัมน์ S:sales_owner)
-  VISIBILITY_MATCH_COLUMN: 'sales_owner',
-  DEFAULT_ROLE: 'viewer'
-};
-
-/** ===== Utils: วันที่/ตัวเลข/ชื่อ ===== */
-function pad2_(n){ return String(n).padStart(2,'0'); }
-
-/** แปลงวันที่จากชีท → ISO 'YYYY-MM-DD' */
+/** ---------- Utils / Adapter ---------- */
 function parseSheetDate_(s){
   if (s == null) return null;
   var t = String(s).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t; // yyyy-mm-dd
-  var m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); // dd/mm/yyyy
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  var m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (m){
     var d = new Date(+m[3], +m[2]-1, +m[1]);
     if (!isNaN(d.getTime())){
-      return d.getFullYear() + '-' + pad2_(d.getMonth()+1) + '-' + pad2_(d.getDate());
+      var mm = ('0'+(d.getMonth()+1)).slice(-2);
+      var dd = ('0'+d.getDate()).slice(-2);
+      return d.getFullYear() + '-' + mm + '-' + dd;
     }
   }
   return null;
 }
-
-/** '#,##0.00' → number */
 function parseAmount_(v){
   if (v == null) return 0;
   var s = String(v).replace(/[, ]/g,'');
   var n = Number(s);
   return isFinite(n) ? n : 0;
 }
-
-/** ทำให้ชื่อเปรียบเทียบได้เสมอ (ตัดเว้นวรรค/จุด, เป็นตัวพิมพ์เล็ก) */
 function canonicalizeName_(s){
-  return String(s || '')
-    .toLowerCase()
-    .replace(/[.\s]+/g,'')
-    .trim();
+  return String(s||'').toLowerCase().replace(/[.\s]+/g,'').trim();
 }
-
-/** ===== Data layer: อ่านชีท ===== */
-function getDoc_(){
-  return SpreadsheetApp.openById(SHEET_DOC_ID);
-}
-function getFirstSheetByNames_(names){
-  var ss = getDoc_();
-  for (var i=0;i<names.length;i++){
-    var sh = ss.getSheetByName(names[i]);
-    if (sh) return sh;
-  }
-  return null;
-}
-
-/** อ่านช่วง A1:AI ของชีท Online → 2D array */
-function readOnlineValues_(){
-  var sh = getFirstSheetByNames_(ONLINE_CFG.DATA_SHEET_CANDIDATES);
-  if (!sh) throw new Error('ไม่พบชีท Online/ช่องทางonline');
-  return { values: sh.getRange(ONLINE_CFG.RANGE_A1).getDisplayValues(), sheetName: sh.getName() };
-}
-
-/** map คอลัมน์ A..AI → key อังกฤษ ตาม ONLINE_CFG.COL */
-function mapRowToObject_(rowArr){
-  var letters = Object.keys(ONLINE_CFG.COL); // ['A','B',...,'AI']
-  var keys = letters.map(function(L){ return ONLINE_CFG.COL[L]; });
-  var obj = {};
-  for (var i=0;i<keys.length;i++){
-    obj[keys[i]] = (rowArr[i] != null ? rowArr[i] : '');
-  }
-  return obj;
-}
-
-/** คืน rows (raw objects) ไม่ parse */
-function readOnlineRowsRaw_(){
-  var pack = readOnlineValues_();
-  var vals = pack.values;
-  if (!vals || vals.length < 2) return [];
-  var dataRows = vals.slice(1); // ข้ามแถวหัว
-  return dataRows.map(mapRowToObject_);
-}
-
-/** ===== Users directory (แท็บ Users) ===== */
-function readUsers_(){
-  var sh = getFirstSheetByNames_(ONLINE_CFG.USERS_SHEET_CANDIDATES);
-  if (!sh) return [];
-  var vals = sh.getDataRange().getDisplayValues();
-  if (!vals || vals.length < 2) return [];
-  var header = vals[0].map(String);
-  var idxEmail = header.findIndex(function(h){ return /email/i.test(h); });
-  var idxRole  = header.findIndex(function(h){ return /role/i.test(h); });
-  var idxName  = header.findIndex(function(h){ return /name/i.test(h); });
-  return vals.slice(1).map(function(r){
-    return {
-      email: String(r[idxEmail] || '').trim().toLowerCase(),
-      role: String(r[idxRole] || '').trim() || RBAC.DEFAULT_ROLE,
-      name: String(r[idxName] || '').trim()
-    };
-  });
-}
-
-/** ใช้ email ปัจจุบัน (หรือ hint) → หา role/name จาก Users */
-function resolveCurrentUser_(emailHint){
-  var email = (emailHint || Session.getActiveUser().getEmail() || '').toLowerCase().trim();
-  var list = readUsers_();
-  var found = list.find(function(x){ return x.email === email; });
-  if (!found) return null;
-  return {
-    id: email,
-    email: email,
-    displayName: found.name || email,
-    role: found.role
-  };
-}
-
-/** ===== Adapter: raw row → ระเบียนพร้อมใช้ ===== */
 function adaptOnlineRow_(r){
   var created = parseSheetDate_(r['created_at']) || null;
-  var yyyymm  = String(r['yyyymm'] || '').trim() || (created ? created.slice(0,7).replace('-','') : null);
-  var isReal  = String(r['erp_code'] || '').trim() !== ''; // TRUE เมื่อมี ERP code
-
-  // รองรับหัว 'sale_owner' แทน 'sales_owner' เผื่อไฟล์มีสะกดต่าง
-  var salesOwner = r['sales_owner'] || r['sale_owner'] || '';
-
+  var yyyymm  = String(r['yyyymm']||'').trim() || (created ? created.slice(0,7).replace('-','') : null);
+  var isReal  = String(r['erp_code']||'').trim() !== '';
+  var owner   = r['sales_owner'] || r['sale_owner'] || '';
   return {
-    row_no: Number(r['row_no']) || null,
-    prospect_code: String(r['prospect_code'] || ''),
-    erp_code: r['erp_code'] || null,
+    prospect_code: String(r['prospect_code']||''),
+    company: r['company'] || null,
+    sales_owner: owner || null,
+    case_owner: r['case_owner'] || null,
+    status: r['status'] || null,
+    amount: parseAmount_(r['amount']),
     created_at: created,
-    date_text: r['date_text'] || null,
+    updated_at: parseSheetDate_(r['updated_at']),
+    quote_date: parseSheetDate_(r['quote_date']),
+    next_followup_date: parseSheetDate_(r['next_followup_date']),
+    handoff_date: parseSheetDate_(r['handoff_date']),
     yyyymm: yyyymm,
-    year: Number(r['year']) || null,
-    month: r['month'] || null,
-    day: Number(r['day']) || null,
-    seq_in_month: Number(r['seq_in_month']) || null,
-    company: r['company'] || null,                     // K
-    contacts_count: Number(r['contacts_count']) || null,
+    is_real_customer: isReal,
+    admin_owner: r['admin_owner'] || null,
     area_text: r['area_text'] || null,
     lead_source: r['lead_source'] || null,
-    is_new_customer: r['is_new_customer'] || null,
-    added_line: r['added_line'] || null,
-    admin_owner: r['admin_owner'] || null,
-    case_owner: r['case_owner'] || null,
-    sales_owner: salesOwner || null,                   // S
-    handoff_date: parseSheetDate_(r['handoff_date']),
+    last_followup_date: parseSheetDate_(r['last_followup_date']),
+    last_follower: r['last_follower'] || null,
+    po_date: parseSheetDate_(r['po_date']),
+    so_number: r['so_number'] || null,
+    payment_term: r['payment_term'] || null,
     items: r['items'] || null,
-    amount: parseAmount_(r['amount']),                 // V
     needs: r['needs'] || null,
-    status: r['status'] || null,                       // X
-    quote_date: parseSheetDate_(r['quote_date']),      // Y
-    last_followup_date: parseSheetDate_(r['last_followup_date']), // Z
-    last_follower: r['last_follower'] || null,         // AA
-    po_date: parseSheetDate_(r['po_date']),            // AB
-    payment_term: r['payment_term'] || null,           // AC
-    so_number: r['so_number'] || null,                 // AD
-    next_followup_date: parseSheetDate_(r['next_followup_date']), // AE
-    status_changed_at: r['status_changed_at'] || null, // AF
-    owner_changed_at: r['owner_changed_at'] || null,   // AG
-    updated_at: parseSheetDate_(r['updated_at']),      // AH
-    is_real_customer: isReal                            // AI
+    // ส่งต่อสีจากชีทจริง
+    _status_bg: r._status_bg || '',
+    _status_fc: r._status_fc || ''
   };
 }
+function fetchOnlineRecords_(){ return readOnlineRowsRaw_().map(adaptOnlineRow_); }
 
-/** อ่านชีท Online → ระเบียนพร้อมใช้ทั้งหมด */
-function fetchOnlineRecords_(){
-  var raw = readOnlineRowsRaw_();
-  return raw.map(adaptOnlineRow_);
+/** ---------- RBAC (Users: Email/Role/Name) ---------- */
+function getCurrentUser(){
+  var sh = SpreadsheetApp.getActive().getSheetByName('Users');
+  if (!sh) return { id:'unknown', email:'', displayName:'Viewer', role:'viewer' };
+  var vals = sh.getDataRange().getDisplayValues();
+  if (!vals || vals.length < 2) return { id:'unknown', email:'', displayName:'Viewer', role:'viewer' };
+  var email = (Session.getActiveUser().getEmail()||'').toLowerCase().trim();
+  var header = vals[0].map(String);
+  var iE = header.findIndex(h=>/email/i.test(h)), iR = header.findIndex(h=>/role/i.test(h)), iN = header.findIndex(h=>/name/i.test(h));
+  var rec = vals.slice(1).map(r=>({email:String(r[iE]||'').toLowerCase().trim(), role:String(r[iR]||'').trim()||'viewer', name:String(r[iN]||'').trim()})).find(x=>x.email===email);
+  if (!rec) return { id:'unknown', email:'', displayName:'Viewer', role:'viewer' };
+  return { id: email, email: email, displayName: rec.name || email, role: rec.role };
 }
-
-/** ===== RBAC: จำกัดการเห็นเฉพาะเซลล์ ===== */
 function filterRowsByRBAC_(rows, user){
   if (!user) return [];
-  if (String(user.role).toLowerCase() !== 'sales') return rows; // เฉพาะเซลล์เท่านั้นที่ต้องจำกัด
+  if (String(user.role).toLowerCase() !== 'sales') return rows;
   var me = canonicalizeName_(user.displayName);
-  return rows.filter(function(r){
-    var v = canonicalizeName_(r[RBAC.VISIBILITY_MATCH_COLUMN] || '');
-    return v && (v === me);
-  });
+  return rows.filter(function(r){ return canonicalizeName_(r['sales_owner']||'') === me; });
 }
 
-/** ===== Debug / Health check ===== */
-
-/** 👇 ใส่อีเมลของคุณตรงนี้ถ้า Session ไม่ส่งอีเมลเข้ามา (เช่น 'sale01@yourco.com') */
-const DEBUG_EMAIL_HINT = '';
-
-/** ทดสอบ 0.81: อ่าน→แปลง→RBAC แล้วพิมพ์ผลใน Logs */
-function test_081_DataAndAccess(){
-  // 1) ระบุผู้ใช้ปัจจุบันจากแท็บ Users
-  var user = resolveCurrentUser_(DEBUG_EMAIL_HINT);
-  if (!user){
-    Logger.log('⚠️ ไม่พบผู้ใช้งานในแท็บ Users (ตรวจอีเมล/Role/Name) หรือ Session ไม่ส่งอีเมล');
-    Logger.log('👉 วิธีแก้: เติม DEBUG_EMAIL_HINT เป็นอีเมลที่อยู่ในแท็บ Users แล้วรันใหม่');
-    return;
-  }
-  Logger.log('👤 Current user: %s (%s)', user.displayName, user.role);
-
-  // 2) อ่านและแปลงข้อมูลทั้งหมด
-  var allRows = fetchOnlineRecords_();
-  Logger.log('📦 Total rows (all): %s', allRows.length);
-
-  // 3) กรองตาม RBAC (เฉพาะ sales จะถูกจำกัด)
-  var visible = filterRowsByRBAC_(allRows, user);
-  Logger.log('🔎 Visible rows (after RBAC): %s', visible.length);
-
-  // 4) แสดงตัวอย่าง 3 แถวแรก
-  visible.slice(0,3).forEach(function(r, i){
-    Logger.log('#%s prospect=%s | company=%s | owner=%s | amount=%s',
-      i+1, r.prospect_code, r.company, r.sales_owner, r.amount);
-  });
-
-  Logger.log('✅ 0.81 OK (Data & Access Base)');
-}
-
-/** =================================================
- *  0.82 — ENUMUS LOADER (อ่านค่าจากแท็บ Enumus / __enumus_col__X)
- *  Flexible parser: รองรับทั้งหัวคอลัมน์แบบ Field|Key|Color
- *  หรือรูปแบบ A:กลุ่ม, B:ค่า, C:สี (กลุ่มซ้ำ/ค่าว่างได้)
- *  ================================================= */
-
-/** อ่านค่าทั้งชีท Enumus → 2D array */
+/** ---------- Enumus (สี/ค่า) ---------- */
 function readEnumusValues_(){
-  var sh = getFirstSheetByNames_(ONLINE_CFG.ENUMUS_SHEET_CANDIDATES);
+  var ss = SpreadsheetApp.getActive();
+  var sh = ss.getSheetByName('Enumus') || ss.getSheetByName('__enumus_col__X');
   if (!sh) return null;
   var vals = sh.getDataRange().getDisplayValues();
   if (!vals || vals.length < 2) return null;
   return vals;
 }
-
-/** แปลง Enumus 2D → โครงสร้าง groups: { [group]: { values:Set, colorByKey:{[key]:hex} } } */
-function parseEnumus_(vals){
-  var header = vals[0].map(function(s){ return String(s||'').trim().toLowerCase(); });
-  var body = vals.slice(1);
-
-  // พยายามหา header มาตรฐาน
-  var iField = header.findIndex(function(h){ return /^(field|group)$/i.test(h); });
-  var iKey   = header.findIndex(function(h){ return /^(key|value|text)$/i.test(h); });
-  var iColor = header.findIndex(function(h){ return /^color$/i.test(h); });
-
-  // ถ้าไม่เจอ header แบบชัดเจน ให้ fallback เป็น A:กลุ่ม, B:ค่า, C:สี
-  if (iField < 0) iField = 0;
-  if (iKey   < 0) iKey   = 1;
-  if (iColor < 0) iColor = 2;
-
-  var groups = {}; // { group: { values:Set, colorByKey:{} } }
-  var currentGroup = '';
-
-  body.forEach(function(r){
-    var g = String(r[iField] || '').trim();
-    var k = String(r[iKey]   || '').trim();
-    var c = String(r[iColor] || '').trim();
-
-    if (g) currentGroup = g;
-    if (!currentGroup) return; // ยังไม่รู้กลุ่ม
-
-    if (!groups[currentGroup]) groups[currentGroup] = { values: new Set(), colorByKey: {} };
-    if (k) groups[currentGroup].values.add(k);
-    if (k && c) groups[currentGroup].colorByKey[k] = normalizeColorHex_(c);
-  });
-
-  // แปลง Set → Array เพื่อ serializable
-  var result = {};
-  Object.keys(groups).forEach(function(g){
-    result[g] = {
-      values: Array.from(groups[g].values),
-      colorByKey: groups[g].colorByKey
-    };
-  });
-  return result;
-}
-
-/** ช่วย normalize สีให้เป็น #RRGGBB ถ้าเป็น rgb()/ชื่อสี จะปล่อยผ่าน */
 function normalizeColorHex_(s){
   var t = String(s||'').trim();
   if (!t) return '';
-  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(t)) {
-    // 3 หรือ 6 หลักก็ได้ (ถ้า 3 จะคงไว้)
-    if (t.length === 4) {
-      // #abc → #aabbcc
-      var r = t[1], g = t[2], b = t[3];
-      return '#' + r + r + g + g + b + b;
-    }
+  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(t)){
+    if (t.length === 4){ var r=t[1],g=t[2],b=t[3]; return ('#'+r+r+g+g+b+b).toUpperCase(); }
     return t.toUpperCase();
   }
-  return t; // เผื่อเป็น 'rgb(…)' หรือชื่อสี
+  return t;
 }
-
-/** โหลด Enumus → object พร้อมใช้; ถ้าไม่มีชีท จะคืน {} */
-function loadEnumus_(){
-  var vals = readEnumusValues_();
-  if (!vals) return {};
-  return parseEnumus_(vals);
+function parseEnumus_(vals){
+  var header = vals[0].map(function(s){ return String(s||'').trim().toLowerCase(); });
+  var body = vals.slice(1);
+  var iField = header.findIndex(function(h){ return /^(field|group)$/i.test(h); });
+  var iKey   = header.findIndex(function(h){ return /^(key|value|text)$/i.test(h); });
+  var iColor = header.findIndex(function(h){ return /^color$/i.test(h); });
+  if (iField<0) iField=0; if (iKey<0) iKey=1; if (iColor<0) iColor=2;
+  var groups={}, current='';
+  body.forEach(function(r){
+    var g=String(r[iField]||'').trim(), k=String(r[iKey]||'').trim(), c=String(r[iColor]||'').trim();
+    if (g) current=g;
+    if (!current) return;
+    if (!groups[current]) groups[current]={ values:new Set(), colorByKey:{} };
+    if (k) groups[current].values.add(k);
+    if (k && c) groups[current].colorByKey[k] = normalizeColorHex_(c);
+  });
+  var out={}; Object.keys(groups).forEach(function(g){
+    out[g]={ values:Array.from(groups[g].values), colorByKey:groups[g].colorByKey };
+  });
+  return out;
 }
-
-/** ดึง meta ของสถานะ: { color, label } (label=ค่าสถานะเดิม) */
+function loadEnumus_(){ var v=readEnumusValues_(); return v ? parseEnumus_(v) : {}; }
+function getAllStatusValues_(enumus){
+  enumus = enumus || loadEnumus_();
+  var gk=['status','สถานะ','สถานะปัจจุบันของลูกค้า','customer_status','case_status'];
+  for (var i=0;i<gk.length;i++){ var g=enumus[gk[i]]; if (g && g.values && g.values.length) return g.values; }
+  return [];
+}
+/** 0.831 — ดึงสีสถานะรองรับชื่อกลุ่มไทย */
 function getStatusMeta_(status, enumus){
   enumus = enumus || loadEnumus_();
   var key = String(status||'').trim();
   var color = '';
-  // กลุ่มสถานะอาจสะกด 'status' หรือไทย ให้ลองหลายแบบ
-  var groupKeys = ['status', 'สถานะ', 'customer_status', 'case_status'];
+  var groupKeys = ['status', 'สถานะ', 'สถานะปัจจุบันของลูกค้า', 'customer_status', 'case_status'];
   for (var i=0;i<groupKeys.length;i++){
     var g = enumus[groupKeys[i]];
-    if (g && g.colorByKey && key && g.colorByKey[key]) {
-      color = g.colorByKey[key];
-      break;
-    }
+    if (g && g.colorByKey && key && g.colorByKey[key]) { color = g.colorByKey[key]; break; }
   }
-  if (!color) color = '#E0E0E0'; // ค่าเริ่มต้น (เทาอ่อน) เมื่อไม่พบใน Enumus
+  if (!color) color = '#3a3a3a'; // โทนมืดรองรับธีมเดิม
   return { label: key, color: color };
 }
 
-/** คืนชุดค่าทั้งหมดของสถานะ (สำหรับ dropdown/filter ภายหลัง) */
-function getAllStatusValues_(enumus){
-  enumus = enumus || loadEnumus_();
-  var groupKeys = ['status', 'สถานะ', 'customer_status', 'case_status'];
-  for (var i=0;i<groupKeys.length;i++){
-    var g = enumus[groupKeys[i]];
-    if (g && g.values && g.values.length) return g.values;
+/** ---------- Sort ---------- */
+function sortByBasis_(rows, basis, dir){
+  var b = basis || 'updated_at';
+  var asc = String(dir||'desc').toLowerCase() === 'asc';
+
+  function padNum(s){ s = String(s||''); return ('00000000000000000000'+s).slice(-20); }
+  function normDate(v, isAsc){
+    if (!v) return isAsc ? '9999-12-31' : '0000-00-00'; // ดันค่าว่าง ท้าย/ต้นตามทิศทาง
+    return String(v);
   }
-  return []; // ไม่พบ
+  return rows.slice().sort(function(a,b2){
+    var va, vb;
+    if (b === 'prospect_code'){
+      va = padNum(a.prospect_code); vb = padNum(b2.prospect_code);
+    } else if (/_at$|date/i.test(b)) {
+      va = normDate(a[b],  asc);
+      vb = normDate(b2[b], asc);
+    } else {
+      va = String(a[b]||''); vb = String(b2[b]||'');
+    }
+    if (va === vb) return 0;
+    return asc ? (va > vb ? 1 : -1) : (va > vb ? -1 : 1);
+  });
+}
+function pickComparableDate_(r){ return r.updated_at || r.quote_date || r.next_followup_date || r.created_at || r.handoff_date || null; }
+function sortNewestFirst_(rows){
+  return rows.slice().sort(function(a,b){
+    var da=pickComparableDate_(a)||'', db=pickComparableDate_(b)||'';
+    if (da===db) return 0;
+    return (db>da)?1:-1;
+  });
+}
+function unique_(arr){ return Array.from(new Set(arr.filter(function(x){ return x!=null && x!==''; }))); }
+function getAvailableDateFields_(rows){
+  var fields=['updated_at','created_at','quote_date','next_followup_date'];
+  return fields.filter(function(f){ return rows.some(function(r){ return r[f]; }); });
 }
 
-/** รวมข้อมูลแบบย่อสำหรับ UI (เตรียมใช้ใน 0.83) */
-function getCompactRowsForUI_(){
+/** ---------- API สำหรับ Compact ---------- */
+function getCompactMeta(){
+  var header = getOnlineHeaderThaiMap_();
   var enumus = loadEnumus_();
-  var rows = fetchOnlineRecords_();
-  return rows.map(function(r){
+  var user = getCurrentUser();
+  var visible = filterRowsByRBAC_(fetchOnlineRecords_(), user);
+
+  var statuses = getAllStatusValues_(enumus);
+  if (!statuses.length) statuses = unique_(visible.map(function(r){ return r.status; }));
+  var owners = unique_(visible.map(function(r){ return r.sales_owner || r.case_owner || ''; })).sort();
+  var yyyymmValues = unique_(visible.map(function(r){ return r.yyyymm; })).sort().reverse();
+  var dateFields = getAvailableDateFields_(visible);
+
+  return { header, statuses, owners, yyyymmValues, dateFields, user };
+}
+function getCompactRows(filters){
+  var enumus = loadEnumus_();
+  var user = getCurrentUser();
+  var visible = filterRowsByRBAC_(fetchOnlineRecords_(), user);
+  var f = filters || {};
+  var basis=f.dateBasis||null, from=f.from||null, to=f.to||null;
+
+  var filtered = visible.filter(function(r){
+    if (f.yyyymm && r.yyyymm !== f.yyyymm) return false;
+    // เลือกสถานะ → ตัดว่างทิ้ง
+    if (f.status && f.status.length){
+      if (!r.status) return false;
+      if (f.status.indexOf(r.status) === -1) return false;
+    }
+    if (f.owner && f.owner.length){
+      var own = r.sales_owner || r.case_owner || '';
+      if (f.owner.indexOf(own) === -1) return false;
+    }
+    if (typeof f.isReal === 'boolean'){
+      if (!!r.is_real_customer !== f.isReal) return false;
+    }
+    if (basis && (from||to)){
+      var v = r[basis];
+      if (!v) return false;
+      if (from && v < from) return false;
+      if (to && v > to) return false;
+    }
+    return true;
+  });
+
+  // เรียงตามที่ขอ (ดีฟอลต์: updated_at, ใหม่→เก่า)
+  var sorted = sortByBasis_(filtered, f.sortBasis || 'updated_at', f.sortDir || 'desc');
+
+  return sorted.map(function(r){
+    var meta  = getStatusMeta_(r.status||'', enumus);
     var owner = r.sales_owner || r.case_owner || '';
-    var meta = getStatusMeta_((r.status||''), enumus);
+    var bg    = r._status_bg || meta.color || '#3a3a3a';
+    var fc    = r._status_fc || '';
     return {
-      prospect_code: r.prospect_code || '',
-      company: r.company || '',
-      status: r.status || '',
-      status_color: meta.color,
-      owner: owner,
-      updated_at: r.updated_at || ''
+      prospect_code: r.prospect_code||'',
+      company:       r.company||'',
+      status:        r.status||'',
+      status_bg:     bg,
+      status_fc:     fc,
+      status_color:  meta.color||'#3a3a3a', // เผื่อหน้าอื่นต้องใช้
+      owner:         owner,
+      updated_at:    r.updated_at||'',
+      yyyymm:        r.yyyymm||''
     };
   });
 }
+function getLeadDetail(code){
+  if (!code) throw new Error('missing prospect_code');
+  var enumus=loadEnumus_(), header=getOnlineHeaderThaiMap_(), user=getCurrentUser();
+  var r = filterRowsByRBAC_(fetchOnlineRecords_(), user).find(x => (x.prospect_code||'')===String(code));
+  if (!r) throw new Error('ไม่พบรายการ');
 
-/** ====== TEST: 0.82 ====== */
-function test_082_Enumus(){
-  var enumus = loadEnumus_();
-  var statuses = getAllStatusValues_(enumus);
-  Logger.log('🎨 Enumus loaded. status values: %s', statuses.length);
-
-  var rows = fetchOnlineRecords_();
-  var seen = {};
-  rows.forEach(function(r){
-    var s = r.status || '(blank)';
-    if (!seen[s]) {
-      var meta = getStatusMeta_(s, enumus);
-      Logger.log(' - status: "%s" → color=%s', s, meta.color);
-      seen[s] = true;
-    }
-  });
-  Logger.log('✅ 0.82 OK (Enumus Loader & Status meta)');
+  var meta = getStatusMeta_(r.status||'', enumus);
+  var general = [['prospect_code', r.prospect_code], ['company', r.company], ['area_text', r.area_text], ['lead_source', r.lead_source], ['is_real_customer', r.is_real_customer ? 'ลูกค้าจริง' : '—'], ['amount', r.amount]];
+  var owners  = [['status', r.status, meta.color], ['admin_owner', r.admin_owner], ['case_owner', r.case_owner], ['sales_owner', r.sales_owner]];
+  var dates   = [['updated_at', r.updated_at], ['created_at', r.created_at], ['quote_date', r.quote_date], ['next_followup_date', r.next_followup_date], ['po_date', r.po_date], ['handoff_date', r.handoff_date]];
+  var docs    = [['so_number', r.so_number], ['payment_term', r.payment_term]];
+  var notes   = [['needs', r.needs], ['items', r.items], ['last_follower', r.last_follower], ['last_followup_date', r.last_followup_date]];
+  return { header, general, owners, dates, docs, notes };
 }
+
+/** หมายเหตุ: getWebAppUrl() ของคุณมีอยู่แล้วใน Code.gs — ใช้ตัวเดิม */

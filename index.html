@@ -148,6 +148,14 @@
       }).getWebAppUrl();
     }
 
+      function openPage(page){
+    // ป้องกัน popup blocker (เหมือน openManageUsers)
+    const w = window.open('about:blank','_blank');
+    google.script.run.withSuccessHandler(function(baseUrl){
+      if (w) w.location = baseUrl + '?page=' + encodeURIComponent(page);
+    }).getWebAppUrl();
+  }
+
     window.onload = init;
   </script>
 </head>
@@ -178,5 +186,14 @@
       <button class="btn-secondary" style="margin-top:8px;" onclick="closeStatusModal()">ปิด</button>
     </div>
   </div>
+  <!-- วางส่วนปุ่มไว้ใน container/ตำแหน่งที่ต้องการ -->
+<div style="max-width:700px;margin:20px auto;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+  <button class="status-btn" onclick="openPage('Compact')">ลูกค้าOnline (ย่อ)</button>
+  <button class="status-btn" onclick="openPage('Full')">ลูกค้าOnline (เต็ม)</button>
+  <button class="status-btn" onclick="alert('สำรอง #1')">ช่องว่าง #1</button>
+  <button class="status-btn" onclick="alert('สำรอง #2')">ช่องว่าง #2</button>
+  <button class="status-btn" onclick="alert('สำรอง #3')">ช่องว่าง #3</button>
+  <button class="status-btn" onclick="alert('สำรอง #4')">ช่องว่าง #4</button>
+</div>
 </body>
 </html>
