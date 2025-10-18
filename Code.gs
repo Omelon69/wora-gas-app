@@ -1,5 +1,24 @@
 function doGet(e) {
   const page = (e && e.parameter.page) ? e.parameter.page : 'index';
+
+  // intercept: /?page=switch → เปิด AccountChooser
+  if (page === 'switch') {
+    var url = _accountLinks().chooser;
+    return HtmlService.createHtmlOutput(
+      '<html><head><base target="_top"></head>' +
+      '<body>กำลังสลับบัญชี…<script>top.location.replace("'+ url +'");</script></body></html>'
+    );
+  }
+
+  // intercept: /?page=logout → ออกจากระบบทั้งหมด แล้วกลับมา chooser
+  if (page === 'logout') {
+    var url2 = _accountLinks().logout;
+    return HtmlService.createHtmlOutput(
+      '<html><head><base target="_top"></head>' +
+      '<body>กำลังออกจากระบบ…<script>top.location.replace("'+ url2 +'");</script></body></html>'
+    );
+  }
+
   return HtmlService.createHtmlOutputFromFile(page)
     .setTitle('WoraCRM')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -8,6 +27,26 @@ function doGet(e) {
 function getWebAppUrl() {
   return ScriptApp.getService().getUrl();
 }
+/** ---------- Auth URL Helpers ---------- */
+function _accountLinks(){
+  var base = ScriptApp.getService().getUrl(); // Web App URL ปัจจุบัน
+  var chooser = 'https://accounts.google.com/AccountChooser?continue=' + encodeURIComponent(base);
+  var addsession = 'https://accounts.google.com/AddSession?continue='     + encodeURIComponent(base);
+  var logout  = 'https://accounts.google.com/Logout?continue=' + encodeURIComponent(chooser);
+  return {
+    webapp: base,
+    chooser: chooser,            // เลือกบัญชีใหม่
+    addsession: addsession,// เพิ่ม/สลับบัญชีแบบไม่ logout
+    logout: logout,              // ออกจากระบบ Google แล้วกลับมาเลือกบัญชี
+    // เผื่อมีหลายบัญชีอยู่แล้ว อยากจิ้มตามดัชนี
+    authuser0: base + '?authuser=0',
+    authuser1: base + '?authuser=1',
+    authuser2: base + '?authuser=2'
+  };
+}
+
+// ใช้เรียกจาก client เพื่อดึง URL จริง
+function getAccountLinks(){ return _accountLinks(); }
 
 /** ---------- READ Online (A1:AI) + header + สีเซลล์ ---------- */
 function readOnlineValues_(){
@@ -38,15 +77,25 @@ function readOnlineRowsRaw_(){
   if (!vals || vals.length < 2) return [];
   var dataRows = vals.slice(1);
 
-  // index คอลัมน์ "สถานะ" = X
   var COL = {A:'row_no',B:'prospect_code',C:'erp_code',D:'created_at',E:'date_text',F:'yyyymm',G:'year',H:'month',I:'day',J:'seq_in_month',K:'company',L:'contacts_count',M:'area_text',N:'lead_source',O:'is_new_customer',P:'added_line',Q:'admin_owner',R:'case_owner',S:'sales_owner',T:'handoff_date',U:'items',V:'amount',W:'needs',X:'status',Y:'quote_date',Z:'last_followup_date',AA:'last_follower',AB:'po_date',AC:'payment_term',AD:'so_number',AE:'next_followup_date',AF:'status_changed_at',AG:'owner_changed_at',AH:'updated_at',AI:'is_real_customer'};
   var letters = Object.keys(COL);
-  var statusColIdx = letters.indexOf('X'); // 0-based index
 
   return dataRows.map(function(rowArr, i){
     var o = mapRowToObject_(rowArr);
-    o._status_bg = (bgs[i+1]   && bgs[i+1][statusColIdx])  ? bgs[i+1][statusColIdx]  : '';
-    o._status_fc = (fonts[i+1] && fonts[i+1][statusColIdx])? fonts[i+1][statusColIdx]: '';
+
+    // สีทุกคอลัมน์ (K–AI ด้วย, แต่จริงๆครบ A–AI ไปเลย)
+    var bgMap={}, fcMap={};
+    for (var j=0;j<letters.length;j++){
+      var key = COL[letters[j]];
+      var bg = (bgs[i+1]   && bgs[i+1][j])   ? bgs[i+1][j]   : '';
+      var fc = (fonts[i+1] && fonts[i+1][j]) ? fonts[i+1][j] : '';
+      if (bg) bgMap[key] = bg;
+      if (fc) fcMap[key] = fc;
+    }
+    o._bg = bgMap; o._fc = fcMap;
+    o._status_bg = bgMap['status'] || '';
+    o._status_fc = fcMap['status'] || '';
+
     return o;
   });
 }
@@ -96,6 +145,7 @@ function adaptOnlineRow_(r){
   var owner   = r['sales_owner'] || r['sale_owner'] || '';
   return {
     prospect_code: String(r['prospect_code']||''),
+    // คอลัมน์ K–AI (ค่า)
     company: r['company'] || '',
     contacts_count: r['contacts_count'] || '',
     area_text: r['area_text'] || '',
@@ -120,12 +170,21 @@ function adaptOnlineRow_(r){
     status_changed_at: parseSheetDate_(r['status_changed_at']),
     owner_changed_at: parseSheetDate_(r['owner_changed_at']),
     updated_at: parseSheetDate_(r['updated_at']),
+
+    // คอลัมน์นอกเหนือ K–AI ที่ยังจำเป็นต่อระบบ
     created_at: created,
     yyyymm: yyyymm,
-    is_real_customer: (r['is_real_customer'] || '').toString().trim() !== '' ? r['is_real_customer'] : (isReal ? 'TRUE' : ''),
-    // สีสถานะจากชีทจริง
+    // เก็บข้อความดิบจาก E และ Z ไว้ใช้โชว์ตรงๆ
+    date_text_raw: r['date_text'] || '',                 // E
+    last_followup_date_raw: r['last_followup_date'] || '', // Z
+
+    // สี (ทุกคีย์)
+    _bg: r._bg || {},
+    _fc: r._fc || {},
     _status_bg: r._status_bg || '',
-    _status_fc: r._status_fc || ''
+    _status_fc: r._status_fc || '',
+    // ไว้ใช้กรอง
+    is_real_customer: (r['is_real_customer'] || '').toString().trim() !== '' ? r['is_real_customer'] : (isReal ? 'TRUE' : '')
   };
 }
 
@@ -220,7 +279,7 @@ function sortByBasis_(rows, basis, dir){
   function normDate(v, isAsc){
     if (!v) return isAsc ? '9999-12-31' : '0000-00-00';
     return String(v);
-  }
+    }
   return rows.slice().sort(function(a,b2){
     var va, vb;
     if (b === 'prospect_code'){
@@ -268,8 +327,9 @@ function getCompactRows(filters){
   var filtered = visible.filter(function(r){
     if (f.yyyymm && r.yyyymm !== f.yyyymm) return false;
 
+    // สถานะ: เลือกแล้วต้องตรง และตัดช่องว่าง
     if (f.status && f.status.length){
-      if (!r.status) return false;                 // เลือกสถานะใดๆ ตัดว่างทิ้ง
+      if (!r.status) return false;
       if (f.status.indexOf(r.status) === -1) return false;
     }
     if (f.owner && f.owner.length){
@@ -319,43 +379,47 @@ function getLeadDetail(code){
   var status_bg = r._status_bg || meta.color || '#3a3a3a';
   var status_fc = r._status_fc || '';
 
-  // หมวดต่างๆ (K–AI) — ไม่โชว์วันอื่นนอกจาก created_at / updated_at ใน UI
+  // helper ใส่สีจากชีทจริงให้ field
+  function kv(key, value){ return [key, value, (r._bg||{})[key]||'', (r._fc||{})[key]||'']; }
+
+  // หมวดข้อมูล (แสดงครบถ้วนเท่าที่ไม่ใช่ field วันที่) — ตัด AI: ลูกค้าจริง? ออก
   var general = [
-    ['company', r.company],
-    ['contacts_count', r.contacts_count],
-    ['area_text', r.area_text],
-    ['lead_source', r.lead_source],
-    ['is_new_customer', r.is_new_customer],
-    ['added_line', r.added_line],
-    ['is_real_customer', r.is_real_customer ? 'ลูกค้าจริง' : '']
+    kv('company', r.company),
+    kv('contacts_count', r.contacts_count),
+    kv('area_text', r.area_text),
+    kv('lead_source', r.lead_source),
+    kv('is_new_customer', r.is_new_customer),
+    kv('added_line', r.added_line)
   ];
   var owners  = [
-    ['admin_owner', r.admin_owner],
-    ['case_owner',  r.case_owner],
-    ['sales_owner', r.sales_owner]
+    kv('admin_owner', r.admin_owner),
+    kv('case_owner',  r.case_owner),
+    kv('sales_owner', r.sales_owner)
   ];
   var sales   = [
-    ['items',        r.items],
-    ['amount',       r.amount],
-    ['payment_term', r.payment_term],
-    ['so_number',    r.so_number]
+    kv('items',        r.items),
+    kv('amount',       r.amount),
+    kv('payment_term', r.payment_term),
+    kv('so_number',    r.so_number)
   ];
   var tracking = [
-    ['last_follower', r.last_follower]
-    // (last_followup_date, next_followup_date, po_date, handoff_date ... ดึงไว้ แต่ไม่แสดง)
+    kv('last_follower', r.last_follower)
+    // (วันอื่นๆ เก็บไว้ใน data แต่ "ไม่แสดง" ตามสเป็ก)
   ];
-  var notes   = [
-    ['needs', r.needs]
-  ];
+  var notes   = [ kv('needs', r.needs) ];
+
+  // ใต้หัว: E และ Z เท่านั้น
+  var created_display = r.date_text_raw || '';          // E
+  var updated_display = r.last_followup_date_raw || ''; // Z
 
   return {
     header,
     prospect_code: r.prospect_code,
     status_label: r.status || '',
     status_bg, status_fc,
-    created_at: r.created_at || '',
-    updated_at: r.updated_at || '',
+    created_at: created_display,
+    updated_at: updated_display,
     sections: { general, owners, sales, tracking, notes },
-    data: r  // เผื่อโหมดแก้ไขในอนาคต
+    data: r
   };
 }

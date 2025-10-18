@@ -21,6 +21,13 @@
     let currentUserStatus = "";
     let currentUserName = "";
 
+     let LINKS = null;
+    function ensureLinks(cb){
+      if (LINKS) return cb(LINKS);
+      google.script.run.withSuccessHandler(l => { LINKS = l; cb(LINKS); }).getAccountLinks();
+    }
+
+
     function isApproved(status){
       const s = (status||"").toString().trim().toLowerCase();
       return ["อนุมัติ","อนุมัติแล้ว","approved"].includes(s);
@@ -30,6 +37,10 @@
       const statusBtn = document.getElementById('status-btn');
       statusBtn.innerText = 'กำลังโหลด...';
       statusBtn.style.display = 'none';
+
+      // preload ลิงก์บัญชี (กันหน่วงตอนกดปุ่ม)
+      google.script.run.withSuccessHandler(l => { LINKS = l; }).getAccountLinks();
+
       google.script.run.withSuccessHandler(render).getCurrentUserInfo();
     }
 
@@ -113,14 +124,54 @@
     });
     window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeStatusModal(); });
 
+    // ----- UPDATED: เปลี่ยนบัญชี/ออกจากระบบ -----
     function changeAccount(){
-      if(!confirm('คุณต้องการเปลี่ยนบัญชีใช่หรือไม่?')) return;
-      google.script.run.withSuccessHandler(url=>{ window.location.href = url; }).forceGoogleLogout();
+    if(!confirm('คุณต้องการเปลี่ยนบัญชีใช่หรือไม่?')) return;
+
+    ensureLinks(links => {
+      // ชั้น 1: ลองไป AccountChooser ตรงๆ
+      tryNavigate(links.chooser, () => {
+        // ชั้น 2: ถ้าไม่ได้ ลอง AddSession
+        tryNavigate(links.addsession, () => {
+          // ชั้น 3: ไม่ได้จริง ๆ ก็ logout (แรงสุด)
+          tryNavigate(links.logout);
+        });
+      });
+    });
+  }
+
+  // helper: พยายามนำทางไป url; ถ้าถูกบล็อก/ล้มเหลวค่อยเรียก fallback()
+  function tryNavigate(url, fallback){
+    // บาง environment เปลี่ยน location แล้วเงียบ ๆ ให้เปิดผ่าน _top เสมอ
+    try {
+      // ใช้ window.open + target=_top เพื่อลดโอกาสโดนบล็อก
+      const w = window.open(url, '_top');
+      // ถ้าเบราว์เซอร์บล็อก open (คืน null) ลอง location.href
+      if (!w) {
+        window.location.href = url;
+      }
+      // ตั้ง fallback กันกรณีเงียบ ๆ (403/blocked) แล้วไม่เปลี่ยนหน้าใน ~1.2s
+      if (fallback) {
+        setTimeout(() => {
+          // ถ้ายังอยู่หน้าเดิม (heuristic ง่าย ๆ: ยังมองเห็น header เดิม)
+          const stillHere = !!document.querySelector('header');
+          if (stillHere) fallback();
+        }, 1200);
+      }
+    } catch (e) {
+      if (fallback) fallback();
     }
+  }
+
 
     function logout(){
       if(!confirm('คุณต้องการออกจากระบบใช่หรือไม่?')) return;
-      google.script.run.withSuccessHandler(()=>{ location.reload(); }).logoutUser();
+      ensureLinks(links => {
+        // ออกจากระบบ Google แล้วกลับมา chooser
+        window.location.href = links.logout;
+        // หรือ fallback เป็น route ภายในของเรา:
+        // window.location.href = links.webapp + '?page=logout';
+      });
     }
 
     // -------- Manage Users (open new tab; popup-safe) ----------
@@ -188,12 +239,12 @@
   </div>
   <!-- วางส่วนปุ่มไว้ใน container/ตำแหน่งที่ต้องการ -->
 <div style="max-width:700px;margin:20px auto;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-  <button class="status-btn" onclick="openPage('Compact')">ลูกค้าOnline (ย่อ)</button>
-  <button class="status-btn" onclick="openPage('Full')">ลูกค้าOnline (เต็ม)</button>
-  <button class="status-btn" onclick="alert('สำรอง #1')">ช่องว่าง #1</button>
-  <button class="status-btn" onclick="alert('สำรอง #2')">ช่องว่าง #2</button>
-  <button class="status-btn" onclick="alert('สำรอง #3')">ช่องว่าง #3</button>
-  <button class="status-btn" onclick="alert('สำรอง #4')">ช่องว่าง #4</button>
-</div>
+    <button class="status-btn" onclick="openPage('Compact')">ลูกค้าOnline (ย่อ)</button>
+    <button class="status-btn" onclick="openPage('Full')">ลูกค้าOnline (เต็ม)</button>
+    <button class="status-btn" onclick="alert('สำรอง #1')">ช่องว่าง #1</button>
+    <button class="status-btn" onclick="alert('สำรอง #2')">ช่องว่าง #2</button>
+    <button class="status-btn" onclick="alert('สำรอง #3')">ช่องว่าง #3</button>
+    <button class="status-btn" onclick="alert('สำรอง #4')">ช่องว่าง #4</button>
+  </div>
 </body>
 </html>
