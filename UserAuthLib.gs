@@ -171,20 +171,26 @@ function getUserDetailsByEmail(email) {
   return null;
 }
 
-/** ===== Account Switch / Logout (สอดคล้อง Code.gs) =====
- * - changeAccount(): ใช้ AccountChooser
- * - logout(): ออกจากระบบ Google แล้วพากลับไป chooser
- * ฟรอนต์ใหม่เรียก getAccountLinks() จาก Code.gs ได้เลย
- * แต่คงฟังก์ชันเดิมไว้ให้เข้ากันย้อนหลัง (backward compatible)
- */
-function forceGoogleLogout() {
-  // เดิมถูกใช้กับปุ่ม "เปลี่ยนบัญชี" → ควรพาไป AccountChooser
-  var base = ScriptApp.getService().getUrl();
+function getWebAppBase_() {
+  // คืน URL exec ล่าสุดแบบสะอาด เช่น https://script.google.com/macros/s/DEPLOY_ID/exec
+  return ScriptApp.getService().getUrl();
+}
+
+// เปิดตัวเลือกบัญชี โดย *ไม่* logout (บางทีมแค่อยากสลับบัญชี)
+function getAccountChooserUrl() {
+  var base = getWebAppBase_();
   return 'https://accounts.google.com/AccountChooser?continue=' + encodeURIComponent(base);
 }
 
-function logoutUser() {
-  // เดิมฟรอนต์เรียกแล้ว reload; ตอนนี้ให้คืน true เฉยๆ เพื่อไม่พัง
-  // (ฟรอนต์ใหม่ควรใช้ links.logout จาก getAccountLinks() แทน)
-  return true;
+// Logout แล้วพากลับเข้าแอพ
+function getLogoutUrl() {
+  var base = getWebAppBase_();
+  return 'https://accounts.google.com/Logout?continue=' + encodeURIComponent(base);
+}
+
+// ใช้สำหรับ "เปลี่ยนบัญชี": logout ก่อน แล้วเด้งไป AccountChooser ต่อ จากนั้นกลับเข้าแอพ
+function getLogoutThenChooseUrl() {
+  var base = getWebAppBase_();
+  var chooser = 'https://accounts.google.com/AccountChooser?continue=' + encodeURIComponent(base);
+  return 'https://accounts.google.com/Logout?continue=' + encodeURIComponent(chooser);
 }

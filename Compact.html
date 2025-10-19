@@ -86,6 +86,84 @@
     .kv .value{font-size:14px;white-space:pre-wrap;word-break:break-word}
     /* กล่องค่าที่ใช้สีจากชีท */
     .vchip{display:inline-block;padding:4px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.12)}
+
+    /* ====== OVERRIDE: อ่านง่ายบนมือถือ (เพิ่มเฉพาะบล็อกนี้) ====== */
+
+    /* ฐานทั้งหน้า */
+    body { font-size: 16px; line-height: 1.45; -webkit-text-size-adjust: 100%; }
+
+    /* ตาราง */
+    table { font-size: 15px; }
+    th, td { padding: 12px 10px; }
+    thead th { font-size: 14.5px; font-weight: 600; }
+
+    /* ป้ายสถานะในตาราง */
+    .status-pill { font-size: 14px; padding: 6px 12px; }
+    .status-dot { width: 10px; height: 10px; }
+
+    /* Modal / ฟอร์ม */
+    .kv .label { font-size: 13px; }
+    .kv .value { font-size: 15px; }
+    .vchip { font-size: 15px; padding: 5px 10px; }
+    .code-badge { font-size: 16px; }
+    .chip .lab { font-size: 13px; }
+    .chip .val { font-size: 14px; }
+
+    /* ส่วนหัว/ข้อความย่อย */
+    .brand { font-size: 19px; }
+    .muted { font-size: 13px; }
+
+    /* ปุ่ม/อินพุต */
+    input, select, button { font-size: 15px; }
+    button { padding: 10px 14px; }
+
+    /* แถบจำนวน/โหลด */
+    .badge { font-size: 13px; }
+    .loadhint { font-size: 13px; }
+    .spinner { width: 14px; height: 14px; }
+
+    /* จอเล็ก (มือถือ) เพิ่มอีกนิด */
+    @media (max-width: 480px) {
+      body { font-size: 17px; }
+      table { font-size: 16px; }
+      thead th { font-size: 15.5px; }
+      .kv .label { font-size: 14px; }
+      .kv .value { font-size: 16px; }
+      .chip .lab { font-size: 13.5px; }
+      .chip .val { font-size: 15px; }
+      .status-pill { font-size: 15px; padding: 7px 12px; }
+      .badge, .loadhint { font-size: 14px; }
+      input, select, button { font-size: 16px; }
+      button { padding: 11px 16px; }
+      .brand { font-size: 20px; }
+    }
+    /* === OVERRIDE ขยายตัวหนังสือให้ชัดบนมือถือ === */
+body{ font-size:28px; line-height:1.1; -webkit-text-size-adjust:100%; }
+
+table{ font-size:20px; }         /* ตัวเลขในตาราง */
+thead th{ font-size:20px; }     /* หัวตาราง */
+
+.kv .label{ font-size:16px; }     /* ป้ายซ้ายในฟอร์ม */
+.kv .value{ font-size:18px; }     /* ค่าขวาในฟอร์ม */
+
+input,select,button{ font-size:18px; }  /* ช่องกรองและปุ่ม */
+
+.status-pill{ font-size:20px; }   /* แคปซูลสถานะในตาราง/ฟอร์ม */
+/* === OVERRIDE: ขยาย "ค่าในฟอร์ม" ที่มีสีจากชีท === */
+.kv .value .vchip{
+  font-size: 20px;      /* ปรับได้ตามชอบ: 17–18px */
+  padding: 6px 12px;    /* ขยายกรอบให้สมดุล */
+  line-height: 1.35;
+}
+
+/* มือถือ: ใหญ่ขึ้นอีกนิด */
+@media (max-width:480px){
+  .kv .value .vchip{
+    font-size: 22px;
+    padding: 7px 12px;
+  }
+}
+
   </style>
 </head>
 <body>

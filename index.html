@@ -2,31 +2,122 @@
 <html>
 <head>
   <base target="_top">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WoraCRM</title>
   <style>
-    body{font-family:'Segoe UI',Roboto,sans-serif;background:#1e1e1e;margin:0;padding:0;color:#e0e0e0}
-    header{background:linear-gradient(to bottom,#3a3a3a,#1e1e1e);display:flex;align-items:center;justify-content:space-between;padding:10px 20px;box-shadow:0 2px 5px rgba(0,0,0,.4);position:relative}
-    header img{height:36px}
-    header h1{font-size:18px;margin:0;font-weight:normal;color:#fff;position:absolute;left:50%;transform:translateX(-50%)}
-    .status-btn{background:#1976d2;color:#fff;padding:6px 14px;border:none;border-radius:4px;cursor:pointer}
-    .container{max-width:700px;margin:40px auto;background:rgba(40,40,40,.95);border-radius:10px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.5);text-align:center}
-    .modal{display:none;position:fixed;z-index:9999;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.6);justify-content:center;align-items:center}
-    .modal-content{background:#2b2b2b;padding:20px;border-radius:8px;min-width:300px;text-align:center}
-    .modal-content h3{margin-top:0}.modal-content p{margin:8px 0}
-    .modal-content button{margin-top:12px;padding:8px 16px;border:none;border-radius:4px;cursor:pointer}
-    .btn-secondary{background:#555;color:#fff}.btn-danger{background:#d32f2f;color:#fff}.btn-primary{background:#1976d2;color:#fff}
-  </style>
-  <script>
-    let currentUserEmail = "";
-    let currentUserRole  = "";
-    let currentUserStatus = "";
-    let currentUserName = "";
+    /* ===== base typography ===== */
+    html{ font-size:16px; } /* เดสก์ท็อปพื้นฐาน */
 
-     let LINKS = null;
-    function ensureLinks(cb){
-      if (LINKS) return cb(LINKS);
-      google.script.run.withSuccessHandler(l => { LINKS = l; cb(LINKS); }).getAccountLinks();
+    body{
+      font-family:'Segoe UI',Roboto,sans-serif;
+      background:#1e1e1e; margin:0; padding:0; color:#e0e0e0;
     }
 
+    /* ===== Header ===== */
+    header{
+      background:linear-gradient(to bottom,#3a3a3a,#1e1e1e);
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 20px; box-shadow:0 2px 5px rgba(0,0,0,.4); position:relative;
+    }
+    header img{ height:36px; }
+    header h1{
+      font-size:1.125rem; margin:0; font-weight:500; color:#fff;
+      position:absolute; left:50%; transform:translateX(-50%);
+    }
+
+    .status-btn{
+      background:#1976d2; color:#fff; padding:.55rem .9rem;
+      border:none; border-radius:.5rem; cursor:pointer; font-weight:600;
+    }
+
+    .container{
+      max-width:700px; margin:2rem auto; background:rgba(40,40,40,.95);
+      border-radius:10px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,.5); text-align:center;
+    }
+
+    /* ===== Modal ===== */
+    .modal{ display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%;
+            background:rgba(0,0,0,.6); justify-content:center; align-items:center; }
+    .modal-content{ background:#2b2b2b; padding:20px; border-radius:8px; min-width:300px; text-align:center; }
+    .modal-content h3{ margin-top:0; }
+    .modal-content p{ margin:8px 0; }
+    .modal-content button{ margin-top:12px; padding:8px 16px; border:none; border-radius:6px; cursor:pointer; }
+    .btn-secondary{ background:#555; color:#fff; }
+    .btn-danger{ background:#d32f2f; color:#fff; }
+    .btn-primary{ background:#1976d2; color:#fff; }
+
+    /* ===== Nav grid ===== */
+    #nav-grid{
+      max-width:780px; margin:1rem auto; display:none; /* เริ่มซ่อน ไว้โชว์เฉพาะ approved */
+      grid-template-columns:1fr; gap:.75rem; padding:0 1rem;
+    }
+    /* เดสก์ท็อปจริง (เมาส์) เท่านั้นที่ 2 คอลัมน์ */
+    @media (min-width:1024px) and (pointer:fine){
+      #nav-grid{ grid-template-columns:1fr 1fr; gap:.9rem; }
+    }
+
+    .nav-btn{
+      background:#1976d2; color:#fff; border:none; border-radius:14px; cursor:pointer;
+      padding:1rem 1.1rem; min-height:4.2rem; font-size:1.05rem; font-weight:700;
+      box-shadow:0 2px 6px rgba(0,0,0,.35);
+    }
+    .nav-btn:active{ transform:translateY(1px); }
+
+    /* ===== Mobile/Tablet: ขยาย “ใหญ่ x3” เฉพาะอุปกรณ์สัมผัส ===== */
+    @media (pointer:coarse){
+      html{ font-size:20px; } /* เพิ่มขนาดฐานให้อ่านง่ายขึ้นทั้งหน้า */
+
+      /* Header โตขึ้นชัดเจน */
+      header{ padding:22px 24px; }
+      header img{ height:72px; }             /* โลโก้ x2 */
+      header h1{ font-size:2rem; }           /* ชื่อแอปใหญ่ ~3x จากเดิม */
+
+      /* ปุ่ม Status ใหญ่ขึ้นมาก */
+      .status-btn{
+        font-size:1.5rem;                    /* ~3x */
+        padding:1rem 1.3rem;
+        border-radius:14px;
+      }
+
+      /* กล่องข้อความต้อนรับ */
+      .container{
+        max-width:95vw; margin:1.2rem auto; padding:1.2rem;
+      }
+      .container h2{ font-size:1.9rem; }     /* ใหญ่ขึ้น */
+      .container p{ font-size:1.2rem; }
+
+      /* เมนู 6 ปุ่ม: บังคับ 1 คอลัมน์เสมอ + ใหญ่ขึ้นมาก */
+      #nav-grid{ grid-template-columns:1fr; gap:1.2rem; }
+      .nav-btn{
+        font-size:1.6rem;                    /* ใหญ่ ~1.5–2x */
+        min-height:6.5rem;
+        padding:1.4rem 1.6rem;
+        border-radius:18px;
+      }
+
+      /* โมดัล: ตัวอักษร/ปุ่มใหญ่ขึ้น */
+      .modal-content{ min-width:88vw; }
+      .modal-content h3{ font-size:1.6rem; }
+      .modal-content p{ font-size:1.15rem; }
+      .modal-content button{
+        font-size:1.1rem; padding:.95rem 1.3rem; border-radius:12px;
+      }
+    }
+  </style>
+  <script>
+    let currentUserEmail  = "";
+    let currentUserRole   = "";
+    let currentUserStatus = "";
+    let currentUserName   = "";
+
+    let LINKS = null;
+    function ensureLinks(cb){
+      if (LINKS) return cb(LINKS);
+      if (google?.script?.run){
+        google.script.run.withSuccessHandler(l => { LINKS = l; cb(LINKS); }).getAccountLinks?.();
+      }
+    }
 
     function isApproved(status){
       const s = (status||"").toString().trim().toLowerCase();
@@ -35,76 +126,111 @@
 
     function init(){
       const statusBtn = document.getElementById('status-btn');
-      statusBtn.innerText = 'กำลังโหลด...';
-      statusBtn.style.display = 'none';
-
-      // preload ลิงก์บัญชี (กันหน่วงตอนกดปุ่ม)
-      google.script.run.withSuccessHandler(l => { LINKS = l; }).getAccountLinks();
-
+      if (statusBtn){
+        statusBtn.innerText = 'กำลังโหลด...';
+        statusBtn.style.display = 'none';
+      }
+      try{ google.script.run.withSuccessHandler(l => { LINKS = l; }).getAccountLinks?.(); }catch(_){}
       google.script.run.withSuccessHandler(render).getCurrentUserInfo();
     }
 
     function render(user){
       const container = document.getElementById('app');
-      currentUserEmail  = user.email;
-      currentUserRole   = user.role || '';
-      currentUserStatus = user.status || '';
-      currentUserName   = user.name || '';
-
+      const grid = document.getElementById('nav-grid');
       const statusBtn = document.getElementById('status-btn');
 
-      if(!user.email){
-        container.innerHTML = `<div class="container"><h2>⚠️ กรุณาเข้าสู่ระบบด้วย Gmail</h2></div>`;
+      if (grid) grid.style.display = 'none';
+      if (statusBtn) statusBtn.style.display = 'none';
+
+      const email  = user?.email || '';
+      const role   = user?.role  || '';
+      const name   = user?.name  || '';
+      const status = user?.status|| '';
+      const found  = !!user?.found;
+
+      currentUserEmail  = email;
+      currentUserRole   = role;
+      currentUserStatus = status;
+      currentUserName   = name;
+
+      if (!email){
+        if (container) {
+          container.innerHTML = `
+            <div class="container">
+              <h2>สวัสดี คุณคือ Guest</h2>
+              <p>โปรดล็อกอินเพื่อเริ่มใช้งาน</p>
+              <button class="btn-primary" onclick="goLogin()">เข้าสู่ระบบ</button>
+            </div>`;
+        }
         return;
       }
 
-      // แสดงปุ่มเฉพาะผู้ที่ได้รับอนุมัติ
-      if (user.found && user.role && user.name && isApproved(user.status)){
+      const approved = found && !!role && !!name && isApproved(status);
+
+      if (found && !approved){
+        if (container) {
+          container.innerHTML = `
+            <div class="container">
+              <h3>✅ ล็อกอินสำเร็จ</h3>
+              <p>ข้อมูลของคุณถูกส่งให้ทีมงานแล้ว กรุณากลับมาตรวจสอบอีกครั้ง</p>
+            </div>`;
+        }
+        return;
+      }
+
+      if (!found){
+        if (container) {
+          container.innerHTML = `
+            <div class="container">
+              <h3>ยินดีต้อนรับ!</h3>
+              <p>ต้องการลงทะเบียนด้วยอีเมลนี้หรือไม่: <b>${email}</b></p>
+              <button class="btn-primary" onclick="confirmRegister('${email}')">✅ ยืนยัน</button>
+              <button class="btn-danger" onclick="location.reload()">❌ ยกเลิก</button>
+            </div>`;
+        }
+        return;
+      }
+
+      if (statusBtn){
         statusBtn.style.display = 'inline-block';
-        statusBtn.innerText = user.name;
-      } else {
-        statusBtn.style.display = 'none';
+        statusBtn.innerText = name || 'Status';
       }
+      if (grid) grid.style.display = 'grid';
 
-      if (user.found && (!user.role || !user.name)){
-        container.innerHTML = `<div class="container"><h3>✅ ล็อกอินสำเร็จ</h3><p>ข้อมูลของคุณถูกส่งให้ทีมงานแล้ว กรุณากลับมาตรวจสอบอีกครั้ง</p></div>`;
-        return;
+      if (container){
+        container.innerHTML = `
+          <div class="container">
+            <h2>สวัสดี ${name}</h2>
+            <p>คุณคือ <b>${role}</b></p>
+          </div>`;
       }
+    }
 
-      if (user.found && user.role && user.name){
-        container.innerHTML = `<div class="container"><h2>สวัสดี ${user.name}</h2><p>คุณคือ <b>${user.role}</b></p></div>`;
-      } else {
-        container.innerHTML = `<div class="container"><h3>ยินดีต้อนรับ!</h3>
-          <p>ต้องการลงทะเบียนด้วยอีเมลนี้หรือไม่: <b>${user.email}</b></p>
-          <button class="btn-primary" onclick="confirmRegister('${user.email}')">✅ ยืนยัน</button>
-          <button class="btn-danger" onclick="location.reload()">❌ ยกเลิก</button></div>`;
-      }
+    function goLogin(){
+      google.script.run.withSuccessHandler(url => {
+        window.top.location.replace(url);
+      }).getLogoutThenChooseUrl();
     }
 
     function confirmRegister(email){
       google.script.run.withSuccessHandler(()=>{
-        document.getElementById('app').innerHTML =
-          `<div class="container"><h3>✅ ล็อกอินสำเร็จ</h3><p>ข้อมูลของคุณถูกส่งให้ทีมงานแล้ว</p></div>`;
+        const el = document.getElementById('app');
+        if (el) el.innerHTML = `<div class="container"><h3>✅ ล็อกอินสำเร็จ</h3><p>ข้อมูลของคุณถูกส่งให้ทีมงานแล้ว</p></div>`;
       }).registerConfirmedUser(email);
     }
 
     // -------- Status Modal ----------
     function openStatusModal(){
       const statusBtn = document.getElementById('status-btn');
-      statusBtn.innerText = 'กำลังโหลด...';
-      statusBtn.disabled = true;
-
+      if (statusBtn){ statusBtn.innerText = 'กำลังโหลด...'; statusBtn.disabled = true; }
       google.script.run.withSuccessHandler((data)=>{
         showModal(data);
-        statusBtn.innerText = currentUserName || 'Status';
-        statusBtn.disabled = false;
+        if (statusBtn){ statusBtn.innerText = currentUserName || 'Status'; statusBtn.disabled = false; }
       }).withFailureHandler(()=>{
-        statusBtn.innerText = currentUserName || 'Status';
-        statusBtn.disabled = false;
+        if (statusBtn){ statusBtn.innerText = currentUserName || 'Status'; statusBtn.disabled = false; }
         alert('❌ โหลดข้อมูลไม่สำเร็จ');
       }).getUserDetailsByEmail(currentUserEmail);
     }
-
     function showModal(data){
       if(!data) return;
       document.getElementById('modal-email').innerText = data.email || '-';
@@ -114,98 +240,49 @@
         (currentUserRole.toLowerCase() === 'adminapp') ? 'block' : 'none';
       document.getElementById('userModal').style.display = 'flex';
     }
-
     function closeStatusModal(){ document.getElementById('userModal').style.display = 'none'; }
+    window.addEventListener('click', (e)=>{ const m=document.getElementById('userModal'); if(e.target===m) closeStatusModal(); });
+    window.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeStatusModal(); });
 
-    // ปิดเมื่อคลิกนอกกล่อง
-    window.addEventListener('click', (e)=>{
-      const modal = document.getElementById('userModal');
-      if(e.target === modal){ closeStatusModal(); }
-    });
-    window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeStatusModal(); });
-
-    // ----- UPDATED: เปลี่ยนบัญชี/ออกจากระบบ -----
+    // -------- เปลี่ยนบัญชี / ออกจากระบบ --------
     function changeAccount(){
-    if(!confirm('คุณต้องการเปลี่ยนบัญชีใช่หรือไม่?')) return;
-
-    ensureLinks(links => {
-      // ชั้น 1: ลองไป AccountChooser ตรงๆ
-      tryNavigate(links.chooser, () => {
-        // ชั้น 2: ถ้าไม่ได้ ลอง AddSession
-        tryNavigate(links.addsession, () => {
-          // ชั้น 3: ไม่ได้จริง ๆ ก็ logout (แรงสุด)
-          tryNavigate(links.logout);
-        });
-      });
-    });
-  }
-
-  // helper: พยายามนำทางไป url; ถ้าถูกบล็อก/ล้มเหลวค่อยเรียก fallback()
-  function tryNavigate(url, fallback){
-    // บาง environment เปลี่ยน location แล้วเงียบ ๆ ให้เปิดผ่าน _top เสมอ
-    try {
-      // ใช้ window.open + target=_top เพื่อลดโอกาสโดนบล็อก
-      const w = window.open(url, '_top');
-      // ถ้าเบราว์เซอร์บล็อก open (คืน null) ลอง location.href
-      if (!w) {
-        window.location.href = url;
-      }
-      // ตั้ง fallback กันกรณีเงียบ ๆ (403/blocked) แล้วไม่เปลี่ยนหน้าใน ~1.2s
-      if (fallback) {
-        setTimeout(() => {
-          // ถ้ายังอยู่หน้าเดิม (heuristic ง่าย ๆ: ยังมองเห็น header เดิม)
-          const stillHere = !!document.querySelector('header');
-          if (stillHere) fallback();
-        }, 1200);
-      }
-    } catch (e) {
-      if (fallback) fallback();
+      if(!confirm('คุณต้องการเปลี่ยนบัญชีใช่หรือไม่?')) return;
+      google.script.run
+        .withSuccessHandler(url => { window.top.location.replace(url); })
+        .withFailureHandler(() => alert('❌ เปิดเปลี่ยนบัญชีไม่สำเร็จ'))
+        .getLogoutThenChooseUrl();
     }
-  }
-
-
     function logout(){
       if(!confirm('คุณต้องการออกจากระบบใช่หรือไม่?')) return;
-      ensureLinks(links => {
-        // ออกจากระบบ Google แล้วกลับมา chooser
-        window.location.href = links.logout;
-        // หรือ fallback เป็น route ภายในของเรา:
-        // window.location.href = links.webapp + '?page=logout';
-      });
+      google.script.run
+        .withSuccessHandler(url => { window.top.location.replace(url); })
+        .withFailureHandler(() => alert('❌ ออกจากระบบไม่สำเร็จ'))
+        .getLogoutUrl();
     }
 
     // -------- Manage Users (open new tab; popup-safe) ----------
     function openManageUsers(){
-      // ปิด status modal ก่อน
       closeStatusModal();
-
       const btn = document.getElementById('manage-users-btn');
-      btn.innerText = 'กำลังเปิด...';
-      btn.disabled  = true;
-
-      // ป้องกัน popup blocker
+      btn.innerText = 'กำลังเปิด...'; btn.disabled  = true;
       const newWin = window.open('about:blank','_blank');
-
       google.script.run.withSuccessHandler((baseUrl)=>{
         const url = baseUrl + '?page=manage_users';
         if (newWin) newWin.location = url;
-        btn.innerText = 'จัดการผู้ใช้';
-        btn.disabled  = false;
+        btn.innerText = 'จัดการผู้ใช้'; btn.disabled  = false;
       }).withFailureHandler(()=>{
         if (newWin) newWin.close();
-        btn.innerText = 'จัดการผู้ใช้';
-        btn.disabled  = false;
+        btn.innerText = 'จัดการผู้ใช้'; btn.disabled  = false;
         alert('❌ เปิดหน้าจัดการผู้ใช้ไม่สำเร็จ');
       }).getWebAppUrl();
     }
 
-      function openPage(page){
-    // ป้องกัน popup blocker (เหมือน openManageUsers)
-    const w = window.open('about:blank','_blank');
-    google.script.run.withSuccessHandler(function(baseUrl){
-      if (w) w.location = baseUrl + '?page=' + encodeURIComponent(page);
-    }).getWebAppUrl();
-  }
+    function openPage(page){
+      const w = window.open('about:blank','_blank');
+      google.script.run.withSuccessHandler(function(baseUrl){
+        if (w) w.location = baseUrl + '?page=' + encodeURIComponent(page);
+      }).getWebAppUrl();
+    }
 
     window.onload = init;
   </script>
@@ -232,19 +309,20 @@
       </div>
       <hr>
       <button class="btn-secondary" onclick="changeAccount()">เปลี่ยนบัญชี</button>
-      <button class="btn-danger" onclick="logout()">ออกจากระบบ</button>
+      <button class="btn-danger"    onclick="logout()">ออกจากระบบ</button>
       <br>
       <button class="btn-secondary" style="margin-top:8px;" onclick="closeStatusModal()">ปิด</button>
     </div>
   </div>
-  <!-- วางส่วนปุ่มไว้ใน container/ตำแหน่งที่ต้องการ -->
-<div style="max-width:700px;margin:20px auto;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-    <button class="status-btn" onclick="openPage('Compact')">ลูกค้าOnline (ย่อ)</button>
-    <button class="status-btn" onclick="openPage('Full')">ลูกค้าOnline (เต็ม)</button>
-    <button class="status-btn" onclick="alert('สำรอง #1')">ช่องว่าง #1</button>
-    <button class="status-btn" onclick="alert('สำรอง #2')">ช่องว่าง #2</button>
-    <button class="status-btn" onclick="alert('สำรอง #3')">ช่องว่าง #3</button>
-    <button class="status-btn" onclick="alert('สำรอง #4')">ช่องว่าง #4</button>
+
+  <!-- Nav Buttons -->
+  <div id="nav-grid">
+    <button class="nav-btn" onclick="openPage('Compact')">ลูกค้าOnline (ย่อ)</button>
+    <button class="nav-btn" onclick="openPage('Full')">ลูกค้าOnline (เต็ม)</button>
+    <button class="nav-btn" onclick="alert('สำรอง #1')">ช่องว่าง #1</button>
+    <button class="nav-btn" onclick="alert('สำรอง #2')">ช่องว่าง #2</button>
+    <button class="nav-btn" onclick="alert('สำรอง #3')">ช่องว่าง #3</button>
+    <button class="nav-btn" onclick="alert('สำรอง #4')">ช่องว่าง #4</button>
   </div>
 </body>
 </html>
