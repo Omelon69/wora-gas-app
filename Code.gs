@@ -368,10 +368,73 @@ function getCompactRows(filters){
   });
 }
 
-/** ---------- API: Modal (รายละเอียดลูกค้า) ---------- */
+function getFullRows(filters){
+  var enumus = loadEnumus_();
+  var user   = getCurrentUser();
+  var all    = filterRowsByRBAC_(fetchOnlineRecords_(), user);
+  var f = filters || {};
+  var basis=f.dateBasis||null, from=f.from||null, to=f.to||null;
+
+  var filtered = all.filter(function(r){
+    if (f.yyyymm && r.yyyymm !== f.yyyymm) return false;
+    if (f.status && f.status.length){
+      if (!r.status) return false;
+      if (f.status.indexOf(r.status) === -1) return false;
+    }
+    if (f.owner && f.owner.length){
+      var own = r.sales_owner || r.case_owner || '';
+      if (f.owner.indexOf(own) === -1) return false;
+    }
+    if (typeof f.isReal === 'boolean'){
+      if (!!r.is_real_customer !== f.isReal) return false;
+    }
+    if (basis && (from||to)){
+      var v = r[basis];
+      if (!v) return false;
+      if (from && v < from) return false;
+      if (to && v > to) return false;
+    }
+    return true;
+  });
+
+  var sorted = sortByBasis_(filtered, f.sortBasis || 'updated_at', f.sortDir || 'desc');
+
+  return sorted.map(function(r){
+    var meta = getStatusMeta_(r.status||'', enumus);
+    var bg   = r._status_bg || meta.color || '#3a3a3a';
+    var fc   = r._status_fc || '';
+
+    return {
+      // ตาราง B,K,M,N,O,R,S,U,V,X,AB,AC
+      prospect_code: r.prospect_code || '',      // B
+      company:       r.company || '',            // K
+      area_text:     r.area_text || '',          // M
+      lead_source:   r.lead_source || '',        // N
+      lead_source_bg:(r._bg||{}).lead_source || '',
+      lead_source_fc:(r._fc||{}).lead_source || '',
+      is_new_customer: r.is_new_customer || '',  // O
+      case_owner:    r.case_owner || '',         // R
+      case_owner_bg: (r._bg||{}).case_owner || '',
+      case_owner_fc: (r._fc||{}).case_owner || '',
+      sales_owner:   r.sales_owner || '',        // S
+      sales_owner_bg:(r._bg||{}).sales_owner || '',
+      sales_owner_fc:(r._fc||{}).sales_owner || '',
+      items:         r.items || '',              // U
+      amount:        (r.amount===''||r.amount==null)?'':r.amount, // V
+      status:        r.status || '',             // X
+      status_bg:     bg,
+      status_fc:     fc,
+      po_date:       r.po_date || '',            // AB
+      payment_term:  r.payment_term || '',       // AC
+      // เผื่อใช้ต่อ
+      yyyymm:        r.yyyymm || '',
+      updated_at:    r.updated_at || ''
+    };
+  });
+}
 function getLeadDetail(code){
   if (!code) throw new Error('missing prospect_code');
-  var enumus = loadEnumus_(), header = getOnlineHeaderThaiMap_(), user = getCurrentUser();
+  var enumus=loadEnumus_(), header=getOnlineHeaderThaiMap_(), user=getCurrentUser();
   var r = filterRowsByRBAC_(fetchOnlineRecords_(), user).find(x => (x.prospect_code||'')===String(code));
   if (!r) throw new Error('ไม่พบรายการ');
 
@@ -379,10 +442,8 @@ function getLeadDetail(code){
   var status_bg = r._status_bg || meta.color || '#3a3a3a';
   var status_fc = r._status_fc || '';
 
-  // helper ใส่สีจากชีทจริงให้ field
   function kv(key, value){ return [key, value, (r._bg||{})[key]||'', (r._fc||{})[key]||'']; }
 
-  // หมวดข้อมูล (แสดงครบถ้วนเท่าที่ไม่ใช่ field วันที่) — ตัด AI: ลูกค้าจริง? ออก
   var general = [
     kv('company', r.company),
     kv('contacts_count', r.contacts_count),
@@ -396,30 +457,95 @@ function getLeadDetail(code){
     kv('case_owner',  r.case_owner),
     kv('sales_owner', r.sales_owner)
   ];
+  // ลำดับ: รายการสินค้า → วันที่ใบเสนอราคา → ยอด → วัน PO → เงื่อนไขชำระ → SO
   var sales   = [
     kv('items',        r.items),
+    kv('quote_date',   r.quote_date),
     kv('amount',       r.amount),
+    kv('po_date',      r.po_date),
     kv('payment_term', r.payment_term),
     kv('so_number',    r.so_number)
   ];
+  // ไม่มี “สถานะ” ในหมวดนี้
   var tracking = [
-    kv('last_follower', r.last_follower)
-    // (วันอื่นๆ เก็บไว้ใน data แต่ "ไม่แสดง" ตามสเป็ก)
+    kv('handoff_date',        r.handoff_date),
+    kv('last_followup_date',  r.last_followup_date),
+    kv('next_followup_date',  r.next_followup_date),
+    kv('status_changed_at',   r.status_changed_at),
+    kv('owner_changed_at',    r.owner_changed_at),
+    kv('updated_at',          r.updated_at),
+    kv('last_follower',       r.last_follower),
+    // ช่องเผื่อกิจกรรมอนาคต
+    ['บันทึกกิจกรรม #1','', '', ''],
+    ['บันทึกกิจกรรม #2','', '', ''],
+    ['บันทึกกิจกรรม #3','', '', '']
   ];
   var notes   = [ kv('needs', r.needs) ];
-
-  // ใต้หัว: E และ Z เท่านั้น
-  var created_display = r.date_text_raw || '';          // E
-  var updated_display = r.last_followup_date_raw || ''; // Z
 
   return {
     header,
     prospect_code: r.prospect_code,
-    status_label: r.status || '',
+    status_label:  r.status || '',
     status_bg, status_fc,
-    created_at: created_display,
-    updated_at: updated_display,
+    created_at: r.date_text_raw || '',
+    updated_at: r.last_followup_date_raw || '',
     sections: { general, owners, sales, tracking, notes },
     data: r
   };
 }
+
+
+
+/** ---------- API: Sales Summary (รวมยอดขายจากใบ PO) ---------- */
+function getSalesSummary(filters){
+  var user = getCurrentUser();
+  var visible = filterRowsByRBAC_(fetchOnlineRecords_(), user);
+  var f = filters || {};
+  var basis=f.dateBasis||null, from=f.from||null, to=f.to||null;
+  var q = String(f.q||'').trim().toLowerCase();
+
+  function textMatch(r){
+    if (!q) return true;
+    var a = String(r.company||'').toLowerCase();
+    var b = String(r.prospect_code||'').toLowerCase();
+    return a.indexOf(q) >= 0 || b.indexOf(q) >= 0;
+  }
+
+  // กรองแบบเดียวกับตาราง + search q
+  var filtered = visible.filter(function(r){
+    if (f.yyyymm && r.yyyymm !== f.yyyymm) return false;
+
+    if (f.status && f.status.length){
+      if (!r.status) return false;
+      if (f.status.indexOf(r.status) === -1) return false;
+    }
+    if (f.owner && f.owner.length){
+      var own = r.sales_owner || r.case_owner || '';
+      if (f.owner.indexOf(own) === -1) return false;
+    }
+    if (typeof f.isReal === 'boolean'){
+      if (!!r.is_real_customer !== f.isReal) return false;
+    }
+    if (basis && (from||to)){
+      var v = r[basis];
+      if (!v) return false;
+      if (from && v < from) return false;
+      if (to && v > to) return false;
+    }
+    if (!textMatch(r)) return false;
+    return true;
+  });
+
+  // รวมยอดเฉพาะแถวที่มี "ใบ PO" (po_date มีค่า) และ amount เป็นตัวเลข
+  var total = 0, count = 0;
+  filtered.forEach(function(r){
+    if (r.po_date && typeof r.amount === 'number' && isFinite(r.amount)){
+      total += r.amount;
+      count++;
+    }
+  });
+
+  return { total_po_amount: total, po_count: count, filtered_count: filtered.length };
+}
+
+
